@@ -1530,4 +1530,4 @@ class BertForQuestionAnswering(BertPreTrainedModel):
             total_loss = (start_loss + end_loss + classification_loss + answer_as_add_sub_expressions_loss + answer_type_loss) / 5   ### Added losses and changed denominator to 5
             outputs = (total_loss,) + outputs
 
-        return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+        return outputs, alt_answers  # (loss), start_logits, end_logits, (hidden_states), (attentions)

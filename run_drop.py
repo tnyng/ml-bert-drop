@@ -307,12 +307,13 @@ def evaluate(args, model, tokenizer, prefix=""):
                 "input_ids": batch[0],
                 "attention_mask": batch[1],
                 "token_type_ids": batch[2],
+                "answers_as_add_sub_numbers": batch[3] #### added
             }
 
             if args.model_type in ["xlm", "roberta", "distilbert", "camembert"]:
                 del inputs["token_type_ids"]
 
-            feature_indices = batch[3]
+            feature_indices = batch[4]
 
             # XLNet and XLM use more arguments for their predictions
             if args.model_type in ["xlnet", "xlm"]:
@@ -340,6 +341,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                 end_logits = output[2]
                 end_top_index = output[3]
                 cls_logits = output[4]
+                alt_answers = output[5]   #### added
 
                 result = SquadResult(
                     unique_id,
@@ -348,6 +350,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                     start_top_index=start_top_index,
                     end_top_index=end_top_index,
                     cls_logits=cls_logits,
+                    alt_answers=alt_answers   #### added
                 )
 
             else:
