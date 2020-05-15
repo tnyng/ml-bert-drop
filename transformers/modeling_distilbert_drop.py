@@ -636,14 +636,24 @@ class DistilBertForSequenceClassification(DistilBertPreTrainedModel):
     DISTILBERT_START_DOCSTRING,
 )
 class DistilBertForQuestionAnswering(DistilBertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, max_seq_length, add_sub_max_length):
+        super(DistilBertForQuestionAnswering, self).__init__(config)
 
         self.distilbert = DistilBertModel(config)
 
         self.max_seq_length = max_seq_length                                    ## Added max_seq_length
-        self.config_dim = config.dim                            ### Added
+        self.config.dim = config.dim
         self.add_sub_max_length = add_sub_max_length                            ### Added
+
+        ####self.qa_outputs = nn.Linear(config.dim, config.num_labels)
+        ####assert config.num_labels == 2
+        ####self.dropout = nn.Dropout(config.qa_dropout)
+
+        self.qa_outputs = nn.Linear(config.dim, config.num_labels)
+        assert config.num_labels == 2
+        self.dropout = nn.Dropout(config.qa_dropout)
+
+        self.init_weights()
 
         ######## answer_as_counts ########
         self.classification_1 = nn.Linear(config.dim*self.max_seq_length, 64)   ## Added linear layer for digit classification
@@ -658,19 +668,12 @@ class DistilBertForQuestionAnswering(DistilBertPreTrainedModel):
         self.classification_5 = nn.Linear(config.dim*self.max_seq_length, 64)   ### Added
         self.classification_6 = nn.Linear(64,3)                                         ### Added
 
-        self.qa_outputs = nn.Linear(config.dim, 2)
-        assert config.num_labels == 2
-        self.dropout = nn.Dropout(config.qa_dropout)
-
-        self.init_weights()
 
     @add_start_docstrings_to_callable(DISTILBERT_INPUTS_DOCSTRING)
     def forward(
         self,
         input_ids=None,
-        attention_mask=None,
-        head_mask=None,
-        inputs_embeds=None,
+        attention_mask=None,        ####head_mask=None,        ####inputs_embeds=None,
         start_positions=None,
         end_positions=None,
         answer_types=None,                    ## added
@@ -723,16 +726,29 @@ class DistilBertForQuestionAnswering(DistilBertPreTrainedModel):
         loss, start_scores, end_scores = outputs[:3]
 
         """
-        distilbert_output = self.distilbert(
-            input_ids=input_ids, attention_mask=attention_mask, head_mask=head_mask, inputs_embeds=inputs_embeds
-        )
-        hidden_states = distilbert_output[0]  # (bs, max_query_len, dim)
+#        distilbert_output = self.distilbert(
+#            input_ids=input_ids, attention_mask=attention_mask, head_mask=head_mask, inputs_embeds=inputs_embeds
+#        )
+#        hidden_states = distilbert_output[0]  # (bs, max_query_len, dim)
+#
+#        hidden_states = self.dropout(hidden_states)  # (bs, max_query_len, dim)
+#        logits = self.qa_outputs(hidden_states)  # (bs, max_query_len, 2)
+#        start_logits, end_logits = logits.split(1, dim=-1)
+#        start_logits = start_logits.squeeze(-1)  # (bs, max_query_len)
+#        end_logits = end_logits.squeeze(-1)  # (bs, max_query_len)
 
+        ######## answer_as_passage_span ########
+        sequence_output = self.distilbert(
+            input_ids=input_ids, attention_mask=attention_mask)####, head_mask=head_mask,inputs_embeds=input_embeds
+#        sequence_output = self.distilbert(
+#            input_ids=input_ids, attention_mask=attention_mask, head_mask=head_mask)
+        hidden_states = sequence_output[0]  # (bs, max_query_len, dim)
         hidden_states = self.dropout(hidden_states)  # (bs, max_query_len, dim)
-        logits = self.qa_outputs(hidden_states)  # (bs, max_query_len, 2)
+
+        logits = self.qa_outputs(hidden_states)
         start_logits, end_logits = logits.split(1, dim=-1)
-        start_logits = start_logits.squeeze(-1)  # (bs, max_query_len)
-        end_logits = end_logits.squeeze(-1)  # (bs, max_query_len)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
 
         ######## answer_as_counts ########
         classification_input = sequence_output.view(sequence_output.size()[0], -1)    ## Reshape into (batch, hidden_size x max_seq_length)
@@ -761,7 +777,7 @@ class DistilBertForQuestionAnswering(DistilBertPreTrainedModel):
         answer_types_stack = torch.stack([answers_as_counts_preds, answers_as_add_sub_preds, q_span], -1)   ### add dummy (q-span) dimension
         alt_answers = torch.gather(answer_types_stack, -1, answer_type_selector).squeeze(-1)                ### selected alternative answer if model predicts: is_impossible
 
-        outputs = (start_logits, end_logits,) + distilbert_output[1:]
+        outputs = (start_logits, end_logits,) + sequence_output[1:] #### change distilbert_output to sequence_output
 
         if start_positions is not None and end_positions is not None:
             # If we are on multi-GPU, split add a dimension
@@ -789,8 +805,9 @@ class DistilBertForQuestionAnswering(DistilBertPreTrainedModel):
 
             total_loss = (start_loss + end_loss + classification_loss + answer_as_add_sub_expressions_loss + answer_type_loss) / 5   ### Added losses and changed denominator to 5
             outputs = (total_loss,) + outputs
-
-        return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+            return total_loss
+        else:
+            return start_logits, end_logits, alt_answers  # (loss), start_logits, end_logits, (hidden_states), (attentions)
 
 
 @add_start_docstrings(

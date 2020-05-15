@@ -462,12 +462,12 @@ def squad_convert_examples_to_features(
                 "is_impossible": tf.TensorShape([]),
             },
             {
-                "answer_type":  tf.TensorShape([None]),  #### added
-                "answer_as_add_sub_expressions":  tf.TensorShape([None]), #### added
-                "answer_as_add_sub_numbers":  tf.TensorShape([None]), #### added
-                "add_sub_mask": tf.TensorShape([None]), #### added
-                "answer_as_counts":  tf.TensorShape([None]), #### added
-            },
+                "answer_type":  tf.TensorShape([]),  #### added
+                "answer_as_add_sub_expressions":  tf.TensorShape([]), #### added
+                "answer_as_add_sub_numbers":  tf.TensorShape([]), #### added
+                "add_sub_mask": tf.TensorShape([]), #### added
+                "answer_as_counts":  tf.TensorShape([]), #### added
+            }
         )
 
         return tf.data.Dataset.from_generator(gen, train_types, train_shapes)

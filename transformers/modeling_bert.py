@@ -1487,6 +1487,11 @@ class BertForQuestionAnswering(BertPreTrainedModel):
 
         ######## answer_as_ad_sub_expressions ########
         answers_as_add_sub_numbers_reshaped = answers_as_add_sub_numbers.unsqueeze(-1).repeat(1,1,self.config_hidden_size)   ### added
+        print("answers_as_add_sub_numbers: ", answers_as_add_sub_numbers.size())
+        print("answers_as_add_sub_numbers_reshaped: ", answers_as_add_sub_numbers_reshaped.size())
+        #answers_as_add_sub_numbers_reshaped = answers_as_add_sub_numbers_reshaped.permute(1,0,2)
+        #print("answers_as_add_sub_numbers_reshaped: ", answers_as_add_sub_numbers_reshaped.size())
+        print("sequence_output: ", sequence_output.size())
         add_sub_input = torch.cat([sequence_output, answers_as_add_sub_numbers_reshaped], 1)                                 ### added
         add_sub_logits = self.classification_3(add_sub_input)                   ### Added
         add_sub_logits = add_sub_logits.view(add_sub_logits.size(0),add_sub_logits.size(2),add_sub_logits.size(1))           ### Added
